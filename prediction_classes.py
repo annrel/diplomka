@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
-
 import numpy as np
 import pandas as pd
 from sklearn import svm
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 from sklearn.model_selection import train_test_split
 import pandas.io.sql as pdsql
@@ -22,14 +20,10 @@ import copy
 from sklearn import metrics
 from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix, matthews_corrcoef
 from imblearn.under_sampling import RandomUnderSampler
-import matplotlib.pyplot as plt
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.svm import LinearSVC, SVC
-from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
-from imblearn.over_sampling import SMOTE 
-from statistics import mean
+from imblearn.over_sampling import SMOTE
+import pickle
 
 class BaseModel:
     
