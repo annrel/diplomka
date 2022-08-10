@@ -1,19 +1,10 @@
-#!/usr/bin/env python3 
-
-import molpher
+#!/usr/bin/env python3
+import os.path
 import pickle
-from rdkit import Chem
-from rdkit.Chem import Draw
 from rdkit.Chem import AllChem
-from rdkit import DataStructs, rdBase
-from rdkit.Chem.Fingerprints import FingerprintMols
-from rdkit.Chem.rdMolDescriptors import GetMorganFingerprint
 import pandas as pd
-import random
 from rdkit import Chem
-from rdkit.Chem.Draw.MolDrawing import MolDrawing, DrawingOptions
 import time
-DrawingOptions.includeAtomNumbers=True
 
 from molpher.core import ExplorationTree as ETree
 from molpher.core import MolpherMol
@@ -23,13 +14,29 @@ loaded_model = pickle.load(open('finalized_model_LR.sav', 'rb'))
 qsar_model = loaded_model
 
 def predict_with_model(morph):
-    morph.dist_to_target = qsar_model.predict_proba([AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(morph.getSMILES()), 2, nBits=2048)])[0][0]
-    return morph.dist_to_target
+    return qsar_model.predict_proba([AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(morph.getSMILES()), 2, nBits=2048)])[0][0]
 
 
 list_of_start_mols = ['c1ccc2c(c1)NNC2']
 
+class StopWatch:
+
+    def __init__(self):
+        self.start = time.perf_counter()
+
+    def reset(self):
+        self.start = time.perf_counter()
+
+    def stop(self, msg='Time it took: '):
+        ret = time.perf_counter() - self.start
+        print(msg + str(ret))
+        self.reset()
+        return ret
+
 for molecule in list_of_start_mols:
+    outfile = f'From_{molecule}_with_model_LR_sascore.csv'
+    if os.path.exists(outfile):
+        os.remove(outfile)
 
     start_mol = MolpherMol(molecule) # some start molecule
     tree = ETree.create(source=start_mol)
@@ -39,45 +46,56 @@ for molecule in list_of_start_mols:
         'accept_max' : 2000,
         'sascoreMax' : 4.0
     }
-    tree.setThreadCount(2)
+    tree.setThreadCount(6)
     print("Number of threads: ", tree.getThreadCount())
 
-#qsar_model = YourModel() # we initalize it ahead of time
-    dis_tar = []
-
-    time_iter = []
     i = 0
-    morph = []
-    prediction = []
-
-    while i < 100:
-        start_time = time.perf_counter()
+    while i < 10:
+        print(f"========= Iteration {i+1} =========")
+        watch = StopWatch()
         print('Generating...')
-        tree.generateMorphs() # vcetne predikce a zapsani do dist_to_target
-        print(len(tree.candidates))
+        tree.generateMorphs()
+        candidates = tree.candidates
+        print(f"Generated {len(candidates)} molecules.")
+        watch.stop()
         print("Sorting...")
         tree.sortMorphs()
+        watch.stop()
         print('Filtering...')
         tree.filterMorphs()
-        print("Generating new mask...")
-        mask = tree.candidates_mask
-        mask = [predict_with_model(x) < 0.5 if mask[idx] else False for idx,x in enumerate(tree.candidates)]
+        watch.stop()
+        print("Predicting...")
+        mask = list(tree.candidates_mask)
+        predictions = [predict_with_model(x) if mask[idx] else False for idx,x in enumerate(candidates)]
+        watch.stop()
+        print("Masking...")
+        for idx,pred in enumerate(predictions):
+            if pred and pred < 0.5:
+                tree.candidates[idx].dist_to_target = pred
+                # print(tree.candidates[idx].dist_to_target)
+                mask[idx] = True
+            else:
+                mask[idx] = False
         tree.candidates_mask = mask
-        print("Saving data...")
-        dis_tar.append((i, [x.dist_to_target for idx,x in enumerate(tree.candidates) if tree.candidates_mask[idx]]))
+        watch.stop()
         print("Extending and pruning...")
         tree.extend()
         tree.prune()
+        watch.stop()
         print("Getting leaves info...")
         leaves = [(x.smiles, x.dist_to_target, x.sascore) for x in tree.leaves]
+        # print(sum(mask), len(leaves))
+        # print(leaves)
         print(f'Number of leaves: {len(leaves)}')
         print(f'Average distance in leaves: {sum([x[1] for x in leaves]) / len(leaves)}')
-        print("Collecting leves data...")
-        morph.append([x[0] for x in leaves])
-        prediction.append([x[1] for x in leaves])
-        print("Time per iteration: ", time.perf_counter() - start_time)
-        i += 1
+        print("Collecting leaves data...")
+        leaves_smiles = [x[0] for x in leaves]
+        leaves_dists = [x[1] for x in leaves]
+        leaves_sascores = [x[2] for x in leaves]
+        watch.stop()
+        print("Saving iteration data...")
+        df = pd.DataFrame({'leaf': leaves_smiles , 'distance': leaves_dists, 'sascore': leaves_sascores, 'iteration': [i+1] * len(leaves_smiles)})
+        df.to_csv(outfile, index=False, header=True if i == 0 else False, mode='a')
+        watch.stop()
 
-    run={'morph':morph , 'prediction': prediction}
-    run=pd.DataFrame(run)
-    run.to_csv(f'From_{molecule}_with_model_LR_sascore.csv',sep='\t', index=False)
+        i += 1
