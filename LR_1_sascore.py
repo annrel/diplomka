@@ -50,7 +50,7 @@ for molecule in list_of_start_mols:
     print("Number of threads: ", tree.getThreadCount())
 
     i = 0
-    while i < 10:
+    while i < 100:
         print(f"========= Iteration {i+1} =========")
         watch = StopWatch()
         print('Generating...')
@@ -69,9 +69,10 @@ for molecule in list_of_start_mols:
         predictions = [predict_with_model(x) if mask[idx] else False for idx,x in enumerate(candidates)]
         watch.stop()
         print("Masking...")
+        candidates = tree.candidates
         for idx,pred in enumerate(predictions):
             if pred and pred < 0.5:
-                tree.candidates[idx].dist_to_target = pred
+                candidates[idx].dist_to_target = pred
                 # print(tree.candidates[idx].dist_to_target)
                 mask[idx] = True
             else:
