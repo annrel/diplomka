@@ -29,7 +29,7 @@ from sklearn.neural_network import MLPClassifier
 
 s=42
 
-data=pd.read_csv('data_including_ch24.csv', sep='\t')
+data=pd.read_csv('../../Desktop/implementation/data_including_ch24.csv', sep='\t')
 fps_data = [AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(x), 2, nBits=2048) for x in data.smiles]
 
 y=np.asarray(data.active.tolist(),dtype="float")
@@ -38,11 +38,11 @@ X = np.array(fps_data,dtype="float")
 smt = SMOTE(random_state = s)
 X_smt, y_smt = smt.fit_resample(X, y)
 
-model = KNeighborsClassifier()
+model = MLPClassifier(activation='logistic', early_stopping=True,hidden_layer_sizes=(683,), learning_rate='adaptive')
 
 model.fit(X_smt, y_smt)
 
-filename = 'finalized_model_kNN.sav'
+filename = '../../Desktop/implementation/finalized_model_MLP.sav'
 pickle.dump(model, open(filename, 'wb'))
 
 #loaded_model = pickle.load(open(filename, 'rb'))

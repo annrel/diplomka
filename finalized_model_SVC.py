@@ -38,11 +38,11 @@ X = np.array(fps_data,dtype="float")
 smt = SMOTE(random_state = s)
 X_smt, y_smt = smt.fit_resample(X, y)
 
-model = KNeighborsClassifier()
+model = SVC(C=9, degree=2)
 
 model.fit(X_smt, y_smt)
 
-filename = 'finalized_model_kNN.sav'
+filename = 'finalized_model_SVC.sav'
 pickle.dump(model, open(filename, 'wb'))
 
 #loaded_model = pickle.load(open(filename, 'rb'))
